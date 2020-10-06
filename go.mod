@@ -1,4 +1,4 @@
-module github.com/jsternberg/zap-logfmt
+module github.com/clear-street/zap-logfmt
 
 require (
 	github.com/davecgh/go-spew v1.1.0 // indirect
@@ -8,3 +8,5 @@ require (
 	go.uber.org/multierr v1.1.0 // indirect
 	go.uber.org/zap v1.9.1
 )
+
+go 1.13

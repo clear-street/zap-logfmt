@@ -290,6 +290,15 @@ func (enc *logfmtEncoder) EncodeEntry(ent zapcore.Entry, fields []zapcore.Field)
 		final.addKey(enc.NameKey)
 		final.AppendString(ent.LoggerName)
 	}
+	if final.MessageKey != "" {
+		final.addKey(enc.MessageKey)
+		final.AppendString(ent.Message)
+	}
+	if enc.buf.Len() > 0 {
+		final.buf.AppendByte(' ')
+		final.buf.Write(enc.buf.Bytes())
+	}
+	addFields(final, fields)
 	if ent.Caller.Defined && final.CallerKey != "" {
 		final.addKey(final.CallerKey)
 		cur := final.buf.Len()
@@ -300,15 +309,6 @@ func (enc *logfmtEncoder) EncodeEntry(ent zapcore.Entry, fields []zapcore.Field)
 			final.AppendString(ent.Caller.String())
 		}
 	}
-	if final.MessageKey != "" {
-		final.addKey(enc.MessageKey)
-		final.AppendString(ent.Message)
-	}
-	if enc.buf.Len() > 0 {
-		final.buf.AppendByte(' ')
-		final.buf.Write(enc.buf.Bytes())
-	}
-	addFields(final, fields)
 	if ent.Stack != "" && final.StacktraceKey != "" {
 		final.AddString(final.StacktraceKey, ent.Stack)
 	}

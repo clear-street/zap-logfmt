@@ -44,8 +44,8 @@ func putEncoder(enc *logfmtEncoder) {
 
 // Custom logger encoding configuration.
 type config struct {
-	alternativeEncodeCaller zapcore.CallerEncoder
-	callerLogLevel          zapcore.Level
+	alternativeCallerEncoder zapcore.CallerEncoder
+	callerLogLevel           zapcore.Level
 }
 
 type logfmtEncoder struct {
@@ -58,8 +58,8 @@ type logfmtEncoder struct {
 // NewEncoder return a new encoder.
 func NewEncoder(cfg zapcore.EncoderConfig, opts ...Option) zapcore.Encoder {
 	c := &config{
-		alternativeEncodeCaller: nil,
-		callerLogLevel:          zapcore.ErrorLevel,
+		alternativeCallerEncoder: nil,
+		callerLogLevel:           zapcore.ErrorLevel,
 	}
 
 	for _, opt := range opts {
@@ -89,7 +89,7 @@ func WithCallerLevel(level zapcore.Level) Option {
 // caller level using the abbreviated format.
 func WithAlternativeCallerEncoder(encoder zapcore.CallerEncoder) Option {
 	return func(c *config) {
-		c.alternativeEncodeCaller = encoder
+		c.alternativeCallerEncoder = encoder
 	}
 }
 
@@ -348,10 +348,10 @@ func (enc *logfmtEncoder) EncodeEntry(ent zapcore.Entry, fields []zapcore.Field)
 				// keep output valid.
 				final.AppendString(ent.Caller.String())
 			}
-		} else if final.config.alternativeEncodeCaller != nil {
+		} else if final.config.alternativeCallerEncoder != nil {
 			final.addKey(final.CallerKey)
 			cur := final.buf.Len()
-			final.config.alternativeEncodeCaller(ent.Caller, final)
+			final.config.alternativeCallerEncoder(ent.Caller, final)
 			if cur == final.buf.Len() {
 				// User-supplied EncodeCaller was a no-op. Fall back to strings to
 				// keep output valid.

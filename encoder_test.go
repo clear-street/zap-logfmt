@@ -112,11 +112,18 @@ func assertOutput(t testing.TB, desc string, expected string, f func(zapcore.Enc
 }
 
 func TestEncodeCaller(t *testing.T) {
-	enc := &logfmtEncoder{buf: bufferpool.Get(), EncoderConfig: &zapcore.EncoderConfig{
-		EncodeTime:     zapcore.EpochTimeEncoder,
-		EncodeDuration: zapcore.SecondsDurationEncoder,
-		EncodeCaller:   zapcore.ShortCallerEncoder,
-	}}
+	enc := &logfmtEncoder{
+		buf: bufferpool.Get(),
+		EncoderConfig: &zapcore.EncoderConfig{
+			EncodeTime:     zapcore.EpochTimeEncoder,
+			EncodeDuration: zapcore.SecondsDurationEncoder,
+			EncodeCaller:   zapcore.ShortCallerEncoder,
+		},
+		config: &config{
+			alternativeEncodeCaller: nil,
+			callerLogLevel:          zapcore.DebugLevel,
+		},
+	}
 
 	var buf *buffer.Buffer
 	var err error
@@ -147,7 +154,7 @@ func TestEncodeCaller(t *testing.T) {
 	enc.EncoderConfig.CallerKey = "caller"
 	encodeEntry()
 	assert.Nil(t, err)
-	assert.Equal(t, "caller=h2g2.go:42 k=v\n", buf.String())
+	assert.Equal(t, "k=v caller=h2g2.go:42\n", buf.String())
 }
 
 func TestEncodeStacktrace(t *testing.T) {

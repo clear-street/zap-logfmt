@@ -69,6 +69,7 @@ func NewEncoder(cfg zapcore.EncoderConfig, opts ...Option) zapcore.Encoder {
 	return &logfmtEncoder{
 		EncoderConfig: &cfg,
 		buf:           bufferpool.Get(),
+		config:        c,
 	}
 }
 

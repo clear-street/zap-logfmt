@@ -42,16 +42,53 @@ func putEncoder(enc *logfmtEncoder) {
 	_logfmtPool.Put(enc)
 }
 
+// Custom logger encoding configuration.
+type config struct {
+	alternativeEncodeCaller zapcore.CallerEncoder
+	callerLogLevel          zapcore.Level
+}
+
 type logfmtEncoder struct {
 	*zapcore.EncoderConfig
 	buf        *buffer.Buffer
 	namespaces []string
+	config     *config
 }
 
-func NewEncoder(cfg zapcore.EncoderConfig) zapcore.Encoder {
+// NewEncoder return a new encoder.
+func NewEncoder(cfg zapcore.EncoderConfig, opts ...Option) zapcore.Encoder {
+	c := &config{
+		alternativeEncodeCaller: nil,
+		callerLogLevel:          zapcore.ErrorLevel,
+	}
+
+	for _, opt := range opts {
+		opt(c)
+	}
+
 	return &logfmtEncoder{
 		EncoderConfig: &cfg,
 		buf:           bufferpool.Get(),
+	}
+}
+
+// Option is a function which can be used to modify the default custom config.
+type Option func(*config)
+
+// WithCallerLevel sets the minimum log level for which the caller is logged.
+// e.g. If it is set to WarnLevel the caller will be logged for only WarnLevel and above logs.
+func WithCallerLevel(level zapcore.Level) Option {
+	return func(c *config) {
+		c.callerLogLevel = level
+	}
+}
+
+// WithAlternativeCallerEncoder sets the caller encoder for logs which are less than the caller level.
+// e.g. If set to the ShortCallerEncoder, the caller is still logged for logs which are less than the
+// caller level using the abbreviated format.
+func WithAlternativeCallerEncoder(encoder zapcore.CallerEncoder) Option {
+	return func(c *config) {
+		c.alternativeEncodeCaller = encoder
 	}
 }
 
@@ -268,6 +305,7 @@ func (enc *logfmtEncoder) clone() *logfmtEncoder {
 	clone.EncoderConfig = enc.EncoderConfig
 	clone.buf = bufferpool.Get()
 	clone.namespaces = enc.namespaces
+	clone.config = enc.config
 	return clone
 }
 
@@ -300,13 +338,24 @@ func (enc *logfmtEncoder) EncodeEntry(ent zapcore.Entry, fields []zapcore.Field)
 	}
 	addFields(final, fields)
 	if ent.Caller.Defined && final.CallerKey != "" {
-		final.addKey(final.CallerKey)
-		cur := final.buf.Len()
-		final.EncodeCaller(ent.Caller, final)
-		if cur == final.buf.Len() {
-			// User-supplied EncodeCaller was a no-op. Fall back to strings to
-			// keep output valid.
-			final.AppendString(ent.Caller.String())
+		if ent.Level >= final.config.callerLogLevel {
+			final.addKey(final.CallerKey)
+			cur := final.buf.Len()
+			final.EncodeCaller(ent.Caller, final)
+			if cur == final.buf.Len() {
+				// User-supplied EncodeCaller was a no-op. Fall back to strings to
+				// keep output valid.
+				final.AppendString(ent.Caller.String())
+			}
+		} else if final.config.alternativeEncodeCaller != nil {
+			final.addKey(final.CallerKey)
+			cur := final.buf.Len()
+			final.config.alternativeEncodeCaller(ent.Caller, final)
+			if cur == final.buf.Len() {
+				// User-supplied EncodeCaller was a no-op. Fall back to strings to
+				// keep output valid.
+				final.AppendString(ent.Caller.TrimmedPath())
+			}
 		}
 	}
 	if ent.Stack != "" && final.StacktraceKey != "" {

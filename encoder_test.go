@@ -112,18 +112,96 @@ func assertOutput(t testing.TB, desc string, expected string, f func(zapcore.Enc
 }
 
 func TestEncodeCaller(t *testing.T) {
-	enc := &logfmtEncoder{
-		buf: bufferpool.Get(),
-		EncoderConfig: &zapcore.EncoderConfig{
-			EncodeTime:     zapcore.EpochTimeEncoder,
-			EncodeDuration: zapcore.SecondsDurationEncoder,
-			EncodeCaller:   zapcore.ShortCallerEncoder,
-		},
-		config: &config{
-			alternativeEncodeCaller: nil,
-			callerLogLevel:          zapcore.DebugLevel,
-		},
+	enc := NewEncoder(zapcore.EncoderConfig{
+		EncodeTime:     zapcore.EpochTimeEncoder,
+		EncodeDuration: zapcore.SecondsDurationEncoder,
+		EncodeCaller:   zapcore.FullCallerEncoder,
+	},
+		WithCallerLevel(zapcore.DebugLevel),
+	).(*logfmtEncoder)
+
+	var buf *buffer.Buffer
+	var err error
+	encodeEntry := func() {
+		buf, err = enc.EncodeEntry(
+			zapcore.Entry{
+				Level:      zapcore.DebugLevel,
+				Time:       time.Time{},
+				LoggerName: "test",
+				Message:    "caller test",
+				Caller: zapcore.EntryCaller{
+					Defined: true,
+					File:    "h2g2.go",
+					Line:    42,
+				},
+			},
+			[]zapcore.Field{
+				zap.String("k", "v"),
+			},
+		)
 	}
+
+	encodeEntry()
+	assert.Nil(t, err)
+	assert.Equal(t, "k=v\n", buf.String())
+
+	enc.truncate()
+	enc.EncoderConfig.CallerKey = "caller"
+	encodeEntry()
+	assert.Nil(t, err)
+	assert.Equal(t, "k=v caller=h2g2.go:42\n", buf.String())
+}
+
+func TestEncodeCallerNoAlternative(t *testing.T) {
+	enc := NewEncoder(zapcore.EncoderConfig{
+		EncodeTime:     zapcore.EpochTimeEncoder,
+		EncodeDuration: zapcore.SecondsDurationEncoder,
+		EncodeCaller:   zapcore.FullCallerEncoder,
+	},
+		WithCallerLevel(zapcore.ErrorLevel),
+	).(*logfmtEncoder)
+
+	var buf *buffer.Buffer
+	var err error
+	encodeEntry := func() {
+		buf, err = enc.EncodeEntry(
+			zapcore.Entry{
+				Level:      zapcore.DebugLevel,
+				Time:       time.Time{},
+				LoggerName: "test",
+				Message:    "caller test",
+				Caller: zapcore.EntryCaller{
+					Defined: true,
+					File:    "h2g2.go",
+					Line:    42,
+				},
+			},
+			[]zapcore.Field{
+				zap.String("k", "v"),
+			},
+		)
+	}
+
+	encodeEntry()
+	assert.Nil(t, err)
+	assert.Equal(t, "k=v\n", buf.String())
+
+	enc.truncate()
+	enc.EncoderConfig.CallerKey = "caller"
+	encodeEntry()
+	assert.Nil(t, err)
+	assert.Equal(t, "k=v\n", buf.String())
+}
+
+func TestEncodeCallerWithAlternative(t *testing.T) {
+	enc := NewEncoder(zapcore.EncoderConfig{
+		EncodeTime:     zapcore.EpochTimeEncoder,
+		EncodeDuration: zapcore.SecondsDurationEncoder,
+		EncodeCaller:   zapcore.FullCallerEncoder,
+	},
+		WithAlternativeCallerEncoder(zapcore.ShortCallerEncoder),
+		WithCallerLevel(zapcore.ErrorLevel),
+	).(*logfmtEncoder)
 
 	var buf *buffer.Buffer
 	var err error
